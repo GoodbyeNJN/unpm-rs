@@ -1,0 +1,24 @@
+[package]
+name = "unpm"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+bon = "3.9.1"
+chrono = { version = "0.4.45", features = ["serde"] }
+clap = { path = "./crates/clap", features = ["derive", "unstable-ext"] }
+clap_complete = { path = "./crates/clap/clap_complete", features = [
+    "unstable-dynamic",
+] }
+color-print = "0.3.7"
+dialoguer = "0.12.0"
+directories = "6.0.0"
+env_logger = "0.11.10"
+indexmap = { version = "2.14.0", features = ["serde"] }
+log = "0.4.30"
+package_json_schema = "0.3.0"
+reqwest = { version = "0.13.4", features = ["query", "blocking", "rustls"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = { version = "1.0.149", features = ["preserve_order"] }
+strum = { version = "0.28.0", features = ["derive"] }
+thiserror = "2.0.18"

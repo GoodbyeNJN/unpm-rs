@@ -1,0 +1,4 @@
+[submodule "crates/clap"]
+	path = crates/clap
+	url = https://github.com/clap-rs/clap.git
+	ignore = dirty

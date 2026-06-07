@@ -1,0 +1,52 @@
+diff --git a/clap_builder/src/error/format.rs b/clap_builder/src/error/format.rs
+index a66386f3..02ef5032 100644
+--- a/clap_builder/src/error/format.rs
++++ b/clap_builder/src/error/format.rs
+@@ -366,7 +366,8 @@ fn write_dynamic_context(
+         | ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand
+         | ErrorKind::DisplayVersion
+         | ErrorKind::Io
+-        | ErrorKind::Format => false,
++        | ErrorKind::Format
++        | ErrorKind::Custom => false,
+     }
+ }
+ 
+diff --git a/clap_builder/src/error/kind.rs b/clap_builder/src/error/kind.rs
+index 7c487350..be8c7531 100644
+--- a/clap_builder/src/error/kind.rs
++++ b/clap_builder/src/error/kind.rs
+@@ -327,6 +327,9 @@ pub enum ErrorKind {
+     /// [`Display`]: std::fmt::Display
+     /// [Format error]: std::fmt::Error
+     Format,
++
++    #[allow(missing_docs)]
++    Custom,
+ }
+ 
+ impl ErrorKind {
+@@ -354,6 +357,7 @@ impl ErrorKind {
+             Self::DisplayVersion => None,
+             Self::Io => None,
+             Self::Format => None,
++            Self::Custom => None,
+         }
+     }
+ }
+diff --git a/clap_builder/src/error/mod.rs b/clap_builder/src/error/mod.rs
+index c9c9c07f..ecc7159f 100644
+--- a/clap_builder/src/error/mod.rs
++++ b/clap_builder/src/error/mod.rs
+@@ -805,6 +805,11 @@ impl<F: ErrorFormatter> Error<F> {
+         err
+     }
+ 
++    #[allow(missing_docs)]
++    pub fn custom(err: Box<dyn error::Error + Send + Sync>) -> Self {
++        Self::new(ErrorKind::Custom).set_source(err)
++    }
++
+     fn formatted(&self) -> Cow<'_, StyledStr> {
+         if let Some(message) = self.inner.message.as_ref() {
+             message.formatted(&self.inner.styles)
