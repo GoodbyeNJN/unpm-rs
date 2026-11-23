@@ -2,12 +2,16 @@ use thiserror::Error;
 
 mod command;
 mod config;
+mod io;
 mod package_manager;
+mod project;
 mod script_runner;
 
 pub use command::CommandError;
 pub use config::{ConfigError, ConfigErrorFrom};
+pub use io::IoError;
 pub use package_manager::PackageManagerError;
+pub use project::ProjectError;
 pub use script_runner::ScriptRunnerError;
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -33,6 +37,12 @@ pub enum Error {
 
     #[error("{0}")]
     Config(#[from] ConfigError),
+
+    #[error("{0}")]
+    Project(#[from] ProjectError),
+
+    #[error("{0}")]
+    Io(#[from] IoError),
 
     #[error(transparent)]
     Raw(BoxedError),

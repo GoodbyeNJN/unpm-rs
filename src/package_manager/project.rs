@@ -4,12 +4,13 @@ use log::debug;
 use package_json_schema::PackageJson;
 
 use crate::package_manager::fs;
+use crate::{ProjectError, Result};
 
 #[derive(Clone, Debug, Default)]
 pub struct Project {
     package_json: Option<PackageJson>,
     package_json_path: PathBuf,
-    node_modules_path: PathBuf,
+    node_modules_bin_path: PathBuf,
 }
 
 impl Project {
@@ -17,56 +18,57 @@ impl Project {
         Self {
             package_json: None,
             package_json_path: path.join(crate::constants::PACKAGE_JSON_NAME),
-            node_modules_path: path.join(crate::constants::NODE_MODULES_NAME),
+            node_modules_bin_path: path
+                .join(crate::constants::NODE_MODULES_NAME)
+                .join(crate::constants::NODE_MODULES_BIN_NAME),
         }
     }
 
-    pub fn find_nearest(cwd: Option<&Path>) -> Option<Self> {
+    pub fn find_nearest(cwd: Option<&Path>) -> Result<Self> {
         debug!("find nearest project start...");
 
-        for ref dir in fs::walk_up(cwd) {
-            let project = Self::new(dir);
+        let start = cwd
+            .map(PathBuf::from)
+            .or_else(|| std::env::current_dir().ok())
+            .unwrap_or_else(|| PathBuf::from("."));
+        for dir in fs::walk_up(Some(&start)) {
+            let project = Self::new(&dir);
 
             if project.is_project_dir() {
                 debug!("find nearest project end, found: {:?}", dir);
 
-                return Some(project);
+                return Ok(project);
             }
         }
 
         debug!("find nearest project end, not found");
-        None
+        Err(ProjectError::ProjectNotFound { start }.into())
     }
 
-    pub fn list_bins(&self) -> Option<Vec<String>> {
+    pub fn list_bins(&self) -> Result<Vec<String>> {
         debug!("list bins start...");
 
-        if !fs::is_dir_with_cache(&self.node_modules_path) {
-            debug!("list bins end, not found");
-            return None;
-        }
-
         let mut bins = vec![];
-        for (_, file_type, file_name) in fs::read_dir_with_cache(&self.node_modules_path)? {
-            let is_file = file_type.is_some_and(|f| f.is_file());
-            if is_file {
+        for (_, file_type, file_name) in fs::read_dir_with_cache(&self.node_modules_bin_path)? {
+            if file_type.is_file() {
                 bins.push(file_name.to_string_lossy().to_string());
             }
         }
 
         debug!("list bins end, bins: {:?}", bins);
-        Some(bins)
+        Ok(bins)
     }
 
-    pub fn list_scripts(&mut self, prefix: Option<&str>) -> Option<Vec<(String, String)>> {
+    pub fn list_scripts(&mut self, prefix: Option<&str>) -> Result<Vec<(String, String)>> {
         debug!("list scripts start...");
 
         let pkg = self.parse_package_json()?;
 
         let scripts = pkg
             .scripts
-            .as_ref()?
+            .as_ref()
             .into_iter()
+            .flatten()
             .filter_map(|(k, v)| v.as_ref().map(|v| (k.to_owned(), v.to_owned())))
             .filter(|(k, _)| match prefix {
                 Some(prefix) => k.starts_with(prefix),
@@ -75,10 +77,10 @@ impl Project {
             .collect();
 
         debug!("list scripts end, scripts: {:?}", scripts);
-        Some(scripts)
+        Ok(scripts)
     }
 
-    pub fn list_dependencies(&mut self, prefix: Option<&str>) -> Option<Vec<(String, String)>> {
+    pub fn list_dependencies(&mut self, prefix: Option<&str>) -> Result<Vec<(String, String)>> {
         debug!("list dependencies start...");
 
         let pkg = self.parse_package_json()?;
@@ -103,13 +105,13 @@ impl Project {
         };
 
         debug!("list dependencies end, dependencies: {:?}", deps);
-        Some(deps)
+        Ok(deps)
     }
 
     pub fn resolve_package_manager_by_dev_engines(&mut self) -> Option<(String, String)> {
         debug!("resolve devEngines packageManager field start...");
 
-        let pkg = self.parse_package_json()?;
+        let pkg = self.parse_package_json().ok()?;
 
         let dev_engines = pkg.other.as_ref()?.get("devEngines")?.as_object()?;
         debug!("dev_engines: {:?}", dev_engines);
@@ -133,7 +135,7 @@ impl Project {
     pub fn resolve_package_manager_by_field(&mut self) -> Option<(String, String)> {
         debug!("resolve packageManager field start...");
 
-        let pkg = self.parse_package_json()?;
+        let pkg = self.parse_package_json().ok()?;
 
         let package_manager = pkg.package_manager.as_ref()?;
         debug!("package_manager: {:?}", package_manager);
@@ -154,23 +156,22 @@ impl Project {
         fs::is_file_with_cache(&self.package_json_path)
     }
 
-    fn parse_package_json(&mut self) -> Option<&PackageJson> {
+    fn parse_package_json(&mut self) -> Result<&PackageJson> {
         debug!("parse package.json start...");
 
-        if self.package_json.is_some() {
-            debug!("parse package.json end, already parsed");
-            return self.package_json.as_ref();
+        if let Some(package_json) = self.package_json.as_ref() {
+            return Ok(package_json);
         }
 
         let content = fs::read_with_cache(&self.package_json_path)?;
-        debug!("content: {:?}", content);
+        let package_json: PackageJson =
+            content
+                .try_into()
+                .map_err(|err| ProjectError::InvalidPackageJson {
+                    path: self.package_json_path.clone(),
+                    reason: format!("{err:?}"),
+                })?;
 
-        self.package_json = content.try_into().ok();
-
-        debug!(
-            "parse package.json end, package_json: {:?}",
-            self.package_json
-        );
-        self.package_json.as_ref()
+        Ok(self.package_json.insert(package_json))
     }
 }

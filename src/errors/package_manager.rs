@@ -1,5 +1,6 @@
 use thiserror::Error;
 
+use super::BoxedError;
 use crate::{PackageManager, PackageManagerOperation};
 
 #[derive(Debug, Error)]
@@ -25,5 +26,19 @@ pub enum PackageManagerError {
         package_manager: PackageManager,
         operation: PackageManagerOperation,
         option: Option<String>,
+    },
+
+    #[error("failed to search npm registry: {source}")]
+    RegistrySearch {
+        #[source]
+        source: BoxedError,
+    },
+
+    #[error("{operation} from {package_manager} returned invalid output: {source}")]
+    InvalidOutput {
+        package_manager: PackageManager,
+        operation: PackageManagerOperation,
+        #[source]
+        source: BoxedError,
     },
 }

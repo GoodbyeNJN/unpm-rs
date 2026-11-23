@@ -29,7 +29,6 @@ pub struct ExecArgs {
         required = true,
         trailing_var_arg = true,
         allow_hyphen_values = true,
-        // add = ArgValueCompleter::new(exec_completer)
         add = wrap_completer(complete)
     )]
     pub forward_args: Vec<String>,
@@ -73,7 +72,7 @@ mod tests {
     }
 }
 
-fn complete(_: &Context, current: &OsStr) -> Option<Vec<CompletionCandidate>> {
+fn complete(_: &Context, current: &OsStr) -> Result<Vec<CompletionCandidate>> {
     let bins = PackageManager::list_bins().call()?;
 
     let mut candidates: Vec<_> = bins
@@ -86,5 +85,5 @@ fn complete(_: &Context, current: &OsStr) -> Option<Vec<CompletionCandidate>> {
         .collect();
 
     candidates.sort_by_key(|candidate| candidate.get_value().to_owned());
-    Some(candidates)
+    Ok(candidates)
 }

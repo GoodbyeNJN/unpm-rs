@@ -93,7 +93,7 @@ pub fn add(ctx: &Context, args: &AddArgs) -> Result<()> {
     pm.run_operation(ctx, op, &resolved_args)
 }
 
-fn complete(ctx: &Context, current: &OsStr) -> Option<Vec<CompletionCandidate>> {
+fn complete(ctx: &Context, current: &OsStr) -> Result<Vec<CompletionCandidate>> {
     let pkgs = PackageManager::search_npm_registry()
         .ctx(ctx)
         .maybe_query(current.to_str())
@@ -116,7 +116,7 @@ fn complete(ctx: &Context, current: &OsStr) -> Option<Vec<CompletionCandidate>> 
         })
         .collect();
 
-    Some(candidates)
+    Ok(candidates)
 }
 
 #[cfg(test)]

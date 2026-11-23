@@ -2,13 +2,14 @@ use std::ffi::OsStr;
 
 use clap_complete::ArgValueCompleter;
 use clap_complete::CompletionCandidate;
+use log::{debug, error};
 
 use crate::cli::Unpm;
 use crate::{Context, Result};
 
 pub fn wrap_completer<F>(completer: F) -> ArgValueCompleter
 where
-    F: Fn(&Context, &OsStr) -> Option<Vec<CompletionCandidate>> + Send + Sync + 'static,
+    F: Fn(&Context, &OsStr) -> Result<Vec<CompletionCandidate>> + Send + Sync + 'static,
 {
     ArgValueCompleter::new(move |current: &OsStr| {
         let ctx = (|| -> Result<_> {
@@ -21,8 +22,23 @@ where
         })();
 
         match ctx {
-            Ok(ctx) => completer(&ctx, current).unwrap_or_default(),
-            Err(_) => vec![],
+            Ok(ctx) => match completer(&ctx, current) {
+                Ok(candidates) => {
+                    debug!(
+                        "completion provider returned {} candidates",
+                        candidates.len()
+                    );
+                    candidates
+                }
+                Err(err) => {
+                    error!("completion provider failed: {err}");
+                    vec![]
+                }
+            },
+            Err(err) => {
+                error!("failed to initialize completion context: {err:?}");
+                vec![]
+            }
         }
     })
 }

@@ -60,22 +60,21 @@ impl PackageManager {
     }
 
     #[builder]
-    pub fn search_npm_registry(ctx: &Context, query: Option<&str>) -> Option<Vec<PackageInfo>> {
-        let query = match query {
-            Some(s) if (2..=64).contains(&s.len()) => s,
-            _ => return None,
+    pub fn search_npm_registry(ctx: &Context, query: Option<&str>) -> Result<Vec<PackageInfo>> {
+        let Some(query) = query.filter(|query| (2..=64).contains(&query.len())) else {
+            return Ok(vec![]);
         };
 
-        search::search_npm_registry(query, &ctx.registry).ok()
+        search::search_npm_registry(query, &ctx.registry)
     }
 
     #[builder]
-    pub fn list_bins(cwd: Option<&Path>) -> Option<Vec<String>> {
+    pub fn list_bins(cwd: Option<&Path>) -> Result<Vec<String>> {
         Project::find_nearest(cwd)?.list_bins()
     }
 
     #[builder]
-    pub fn list_scripts(prefix: Option<&str>, cwd: Option<&Path>) -> Option<Vec<(String, String)>> {
+    pub fn list_scripts(prefix: Option<&str>, cwd: Option<&Path>) -> Result<Vec<(String, String)>> {
         Project::find_nearest(cwd)?.list_scripts(prefix)
     }
 
@@ -83,25 +82,32 @@ impl PackageManager {
     pub fn list_local_dependencies(
         prefix: Option<&str>,
         cwd: Option<&Path>,
-    ) -> Option<Vec<(String, String)>> {
+    ) -> Result<Vec<(String, String)>> {
         Project::find_nearest(cwd)?.list_dependencies(prefix)
     }
 
     #[builder]
-    pub fn list_global_dependencies(&self, prefix: Option<&str>) -> Option<Vec<(String, String)>> {
+    pub fn list_global_dependencies(&self, prefix: Option<&str>) -> Result<Vec<(String, String)>> {
         use PackageManager::*;
         use PackageManagerOperation::*;
 
         if *self != Npm && *self != Pnpm {
-            return None;
+            return Err(PackageManagerError::Unsupported {
+                package_manager: *self,
+                operation: GlobalList,
+                option: None,
+            }
+            .into());
         }
 
-        let adaptor = CommandAdaptor::for_pm(*self, GlobalList)
-            .ok()?
-            .set_extra_args(["--json"]);
-        let (_, stdout, _) = adaptor.silent_run().ok()?;
-
-        let json: serde_json::Value = serde_json::from_str(&stdout).ok()?;
+        let adaptor = CommandAdaptor::for_pm(*self, GlobalList)?.set_extra_args(["--json"]);
+        let (_, stdout, _) = adaptor.silent_run()?;
+        let json: serde_json::Value =
+            serde_json::from_str(&stdout).map_err(|source| PackageManagerError::InvalidOutput {
+                package_manager: *self,
+                operation: GlobalList,
+                source: Box::new(source),
+            })?;
 
         /*
          * Global list json output examples:
@@ -145,16 +151,28 @@ impl PackageManager {
             }
         ]
          */
-        let iter = if json.is_array() {
-            json.as_array()?.iter().next()?
+        let root = if let Some(array) = json.as_array() {
+            let Some(root) = array.first() else {
+                return Ok(vec![]);
+            };
+            root
         } else {
             &json
-        }
-        .get("dependencies")?
-        .as_object()?
-        .keys();
+        };
+        let dependencies = root
+            .get("dependencies")
+            .and_then(serde_json::Value::as_object)
+            .ok_or(PackageManagerError::InvalidOutput {
+                package_manager: *self,
+                operation: GlobalList,
+                source: Box::new(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "missing dependencies object",
+                )),
+            })?;
 
-        let deps = iter
+        let deps = dependencies
+            .keys()
             .filter(|k| match prefix {
                 Some(prefix) => k.starts_with(prefix),
                 None => true,
@@ -162,7 +180,7 @@ impl PackageManager {
             .map(|k| (k.to_owned(), "global packages".to_owned()))
             .collect();
 
-        Some(deps)
+        Ok(deps)
     }
 }
 

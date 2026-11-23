@@ -50,7 +50,7 @@ pub fn run(ctx: &Context, args: &RunArgs) -> Result<()> {
     pm.run_operation(ctx, op, &resolved_args)
 }
 
-fn complete(_: &Context, current: &OsStr) -> Option<Vec<CompletionCandidate>> {
+fn complete(_: &Context, current: &OsStr) -> Result<Vec<CompletionCandidate>> {
     let scripts = PackageManager::list_scripts()
         .maybe_prefix(current.to_str())
         .call()?;
@@ -60,7 +60,7 @@ fn complete(_: &Context, current: &OsStr) -> Option<Vec<CompletionCandidate>> {
         .map(|(k, v)| CompletionCandidate::new(k).help(Some(v.into())))
         .collect();
 
-    Some(candidates)
+    Ok(candidates)
 }
 
 #[cfg(test)]

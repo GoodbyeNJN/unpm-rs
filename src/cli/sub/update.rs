@@ -126,25 +126,24 @@ pub fn update(ctx: &Context, args: &UpdateArgs) -> Result<()> {
     pm.run_operation(ctx, op, &resolved_args)
 }
 
-fn complete(ctx: &Context, current: &OsStr) -> Option<Vec<CompletionCandidate>> {
+fn complete(ctx: &Context, current: &OsStr) -> Result<Vec<CompletionCandidate>> {
     let deps = if !ctx.global {
         PackageManager::list_local_dependencies()
             .maybe_prefix(current.to_str())
-            .call()
+            .call()?
     } else {
-        PackageManager::resolve(ctx)
-            .ok()?
+        PackageManager::resolve(ctx)?
             .list_global_dependencies()
             .maybe_prefix(current.to_str())
-            .call()
+            .call()?
     };
 
-    let candidates = deps?
+    let candidates = deps
         .into_iter()
         .map(|(k, v)| CompletionCandidate::new(k).help(Some(v.into())))
         .collect();
 
-    Some(candidates)
+    Ok(candidates)
 }
 
 #[cfg(test)]

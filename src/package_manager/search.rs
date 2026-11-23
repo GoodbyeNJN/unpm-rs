@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use reqwest::Url;
 use serde::Deserialize;
 
-use crate::{BoxedError, Result};
+use crate::{BoxedError, PackageManagerError, Result};
 
 #[derive(Clone, Debug, Default, Deserialize)]
 struct NpmSearchResponse {
@@ -47,22 +47,26 @@ impl From<&NpmSearchObject> for Option<PackageInfo> {
     }
 }
 
-pub fn search_npm_registry(query: &str, base_url: &str) -> Result<Vec<PackageInfo>, BoxedError> {
-    let url = build_url()
-        .base_url(base_url)
-        .query(query)
-        .size(20)
-        .call()?;
-    let body = reqwest::blocking::get(url)?.text()?;
-    let res: NpmSearchResponse = serde_json::from_str(&body)?;
+pub fn search_npm_registry(query: &str, base_url: &str) -> Result<Vec<PackageInfo>> {
+    let result = (|| -> std::result::Result<Vec<PackageInfo>, BoxedError> {
+        let url = build_url()
+            .base_url(base_url)
+            .query(query)
+            .size(20)
+            .call()?;
+        let body = reqwest::blocking::get(url)?.text()?;
+        let res: NpmSearchResponse = serde_json::from_str(&body)?;
 
-    let pkgs = res
-        .objects
-        .iter()
-        .filter_map(|object| -> Option<_> { object.into() })
-        .collect();
+        let pkgs = res
+            .objects
+            .iter()
+            .filter_map(|object| -> Option<_> { object.into() })
+            .collect();
 
-    Ok(pkgs)
+        Ok(pkgs)
+    })();
+
+    result.map_err(|source| PackageManagerError::RegistrySearch { source }.into())
 }
 
 #[bon::builder]
