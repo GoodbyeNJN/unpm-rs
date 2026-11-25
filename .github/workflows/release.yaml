@@ -35,7 +35,6 @@ jobs:
 
       - name: Build binary
         run: |
-          ./scripts/prepare.sh && \
           docker pull messense/rust-musl-cross:$TARGET_ARCH-musl && \
           docker run --rm -v "$(pwd)":/home/rust/src messense/rust-musl-cross:$TARGET_ARCH-musl cargo build --release && \
           tar -czf $PROJECT_NAME-$TARGET_ARCH.tar.gz -C target/$TARGET_ARCH-unknown-linux-musl/release $BIN_NAME_1 $BIN_NAME_2
