@@ -1,5 +1,7 @@
-mod completion;
-mod main;
-mod sub;
+mod subcommand;
+mod unpm;
+mod unpx;
 
-pub use main::{MainArgs, Unpm, Unpx, unpm, unpx};
+pub use subcommand::*;
+pub use unpm::*;
+pub use unpx::*;

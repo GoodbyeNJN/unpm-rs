@@ -314,36 +314,6 @@ If the package manager is still undetermined and running in an interactive termi
 
 ---
 
-## Contributor Guide
-
-### Setup
-
-This repository includes a local `clap` crate under `crates/clap`.
-Before building, initialize submodules and apply required patches:
-
-```bash
-./scripts/prepare.sh
-```
-
-### Project structure
-
-- `src/lib.rs`: crate entrypoint and exports
-- `src/cli/`: CLI parsing and subcommands
-- `src/cli/main/unpm.rs`: `unpm` command processor
-- `src/cli/main/unpx.rs`: `unpx` alias processor
-- `src/cli/sub/*.rs`: individual subcommand handlers
-- `src/cli/completion.rs`: completion adapter logic
-- `src/context/config.rs`: config loading and parsing
-- `src/package_manager/`: package manager resolution and adaptors
-
-### Testing and development
-
-- Use `cargo test` for the full suite
-- Use `cargo test --lib` for library-level checks
-- Keep parser behavior stable and add regression tests for CLI changes
-
----
-
 ## 中文版
 
 [返回 English](#unpm)
@@ -655,33 +625,3 @@ unpm complete fish >> ~/.config/fish/completions/unpm.fish
 - 全局命令：`--pm` -> `pm.global`
 
 如果仍无法确定包管理器，且当前运行在交互式终端中，`unpm` 会提示选择。
-
----
-
-## 贡献者指南
-
-### 环境准备
-
-本仓库包含本地 `clap` crate（位于 `crates/clap`）。
-构建前请先初始化子模块并应用补丁：
-
-```bash
-./scripts/prepare.sh
-```
-
-### 项目结构
-
-- `src/lib.rs`：crate 入口与导出
-- `src/cli/`：CLI 解析与子命令
-- `src/cli/main/unpm.rs`：`unpm` 主命令处理
-- `src/cli/main/unpx.rs`：`unpx` 别名命令处理
-- `src/cli/sub/*.rs`：各子命令处理逻辑
-- `src/cli/completion.rs`：补全适配逻辑
-- `src/context/config.rs`：配置加载与解析
-- `src/package_manager/`：包管理器解析与适配层
-
-### 测试与开发
-
-- 全量测试：`cargo test`
-- 仅库测试：`cargo test --lib`
-- 变更 CLI 解析行为时，请补充回归测试

@@ -1,17 +1,18 @@
-use crate::package_manager::CommandAdaptor;
 use crate::{PackageManager, PackageManagerOperation};
 
-impl CommandAdaptor {
+use super::Adapter;
+
+impl Adapter {
     pub fn for_pnpm(op: PackageManagerOperation) -> Option<Self> {
         use PackageManagerOperation::*;
 
         let new = |a: &[&str]| {
-            CommandAdaptor::new()
+            Adapter::new()
                 .set_program(PackageManager::Pnpm.to_string())
                 .set_program_args(a.to_owned())
         };
 
-        let adaptor = match op {
+        let adapter = match op {
             Pm => new(&[]),
 
             Install => new(&["install"]),
@@ -36,6 +37,12 @@ impl CommandAdaptor {
             Run => new(&["run"]),
         };
 
-        Some(adaptor)
+        Some(adapter)
+    }
+
+    pub fn for_pnpm_global_list_json() -> Self {
+        Adapter::new()
+            .set_program(PackageManager::Pnpm.to_string())
+            .set_program_args(vec!["list", "--global", "--json"])
     }
 }

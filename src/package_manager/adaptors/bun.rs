@@ -1,17 +1,18 @@
-use crate::package_manager::CommandAdaptor;
 use crate::{PackageManager, PackageManagerOperation};
 
-impl CommandAdaptor {
+use super::Adapter;
+
+impl Adapter {
     pub fn for_bun(op: PackageManagerOperation) -> Option<Self> {
         use PackageManagerOperation::*;
 
         let new = |a: &[&str]| {
-            CommandAdaptor::new()
+            Adapter::new()
                 .set_program(PackageManager::Bun.to_string())
                 .set_program_args(a.to_owned())
         };
 
-        let adaptor = match op {
+        let adapter = match op {
             Pm => new(&[]),
 
             Install => new(&["install"]),
@@ -36,6 +37,6 @@ impl CommandAdaptor {
             Run => new(&["run"]),
         };
 
-        Some(adaptor)
+        Some(adapter)
     }
 }

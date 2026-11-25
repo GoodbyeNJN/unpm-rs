@@ -2,8 +2,9 @@ use std::{path::Path, str::FromStr};
 
 use log::debug;
 
-use crate::PackageManager;
-use crate::package_manager::{Project, fs};
+use crate::{Project, fs};
+
+use super::manager::PackageManager;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DetectionStrategy {

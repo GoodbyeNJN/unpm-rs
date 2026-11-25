@@ -1,24 +1,25 @@
-use crate::{
-    CommandError, PackageManager, PackageManagerError, PackageManagerOperation, Result,
-    ScriptRunner, ScriptRunnerError, ScriptRunnerOperation, bail,
-};
+pub mod bun;
+pub mod node;
+pub mod npm;
+pub mod pnpm;
+pub mod yarn;
+pub mod yarn_berry;
 
-mod bun;
-mod node;
-mod npm;
-mod pnpm;
-mod yarn;
-mod yarn_berry;
+use std::process::Command;
+
+use anyhow::{Result, anyhow};
+
+use super::{PackageManager, PackageManagerOperation, ScriptRunner, ScriptRunnerOperation, error};
 
 #[derive(Clone, Debug, Default)]
-pub struct CommandAdaptor {
+pub struct Adapter {
     program: String,
     program_args: Vec<String>,
     extra_args: Vec<String>,
     separate: bool,
 }
 
-impl CommandAdaptor {
+impl Adapter {
     pub fn new() -> Self {
         Self {
             separate: false,
@@ -26,7 +27,7 @@ impl CommandAdaptor {
         }
     }
 
-    pub fn for_pm(pm: PackageManager, op: PackageManagerOperation) -> Result<Self> {
+    pub fn for_package_manager(pm: PackageManager, op: PackageManagerOperation) -> Result<Self> {
         use PackageManager::*;
 
         match pm {
@@ -37,28 +38,22 @@ impl CommandAdaptor {
             Bun => Self::for_bun(op),
         }
         .ok_or_else(|| {
-            PackageManagerError::Unsupported {
-                package_manager: pm,
-                operation: op,
-                option: None,
-            }
-            .into()
+            anyhow!(error::unsupported_package_manager_operation(
+                &pm, &op, &None
+            ))
         })
     }
 
-    pub fn for_runner(runner: ScriptRunner, op: ScriptRunnerOperation) -> Result<Self> {
+    pub fn for_script_runner(runner: ScriptRunner, op: ScriptRunnerOperation) -> Result<Self> {
         use ScriptRunner::*;
 
         match runner {
             Node => Self::for_node(op),
         }
         .ok_or_else(|| {
-            ScriptRunnerError::Unsupported {
-                script_runner: ScriptRunner::Node,
-                operation: ScriptRunnerOperation::Run,
-                option: None,
-            }
-            .into()
+            anyhow!(error::unsupported_script_runner_operation(
+                &runner, &op, &None
+            ))
         })
     }
 
@@ -97,63 +92,6 @@ impl CommandAdaptor {
         self
     }
 
-    pub fn run(&self, dry: bool) -> Result<()> {
-        if dry {
-            color_print::cprintln!("<green>[dry-run]</> {}", self);
-
-            return Ok(());
-        }
-
-        let status = self
-            .to_command()
-            .status()
-            .map_err(|source| CommandError::Spawn {
-                command: self.to_string(),
-                source,
-            })?;
-        self.check_status(&status)?;
-
-        Ok(())
-    }
-
-    pub fn silent_run(&self) -> Result<(std::process::ExitStatus, String, String)> {
-        let output = self
-            .to_command()
-            .output()
-            .map_err(|source| CommandError::Spawn {
-                command: self.to_string(),
-                source,
-            })?;
-        let status = output.status;
-        self.check_status(&status)?;
-
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-
-        Ok((status, stdout, stderr))
-    }
-
-    fn check_status(&self, status: &std::process::ExitStatus) -> Result<()> {
-        if !status.success() {
-            bail!(CommandError::Exit {
-                command: self.to_string(),
-                code: status
-                    .code()
-                    .map(|code| code.to_string())
-                    .unwrap_or("unknown".to_owned()),
-            });
-        }
-
-        Ok(())
-    }
-
-    fn to_command(&self) -> std::process::Command {
-        let mut cmd = std::process::Command::new(&self.program);
-        cmd.args(self.combine_args());
-
-        cmd
-    }
-
     fn combine_args(&self) -> Vec<String> {
         let mut args = self.program_args.to_owned();
         let mut iter = self.extra_args.iter().cloned();
@@ -177,21 +115,18 @@ impl CommandAdaptor {
     }
 }
 
-impl std::fmt::Display for CommandAdaptor {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let str = if self.program_args.is_empty() {
-            self.program.to_owned()
-        } else {
-            format!("{} {}", self.program, self.combine_args().join(" "))
-        };
+impl From<Adapter> for Command {
+    fn from(adapter: Adapter) -> Self {
+        let mut cmd = Command::new(&adapter.program);
+        cmd.args(adapter.combine_args());
 
-        write!(f, "{}", str)
+        cmd
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::CommandAdaptor;
+    use super::Adapter;
     use super::PackageManager::*;
     use super::PackageManagerOperation::*;
 
@@ -208,8 +143,8 @@ mod tests {
         ];
 
         for (manager, expected) in cases {
-            let actual =
-                CommandAdaptor::for_pm(manager, Add).map(|adaptor| adaptor.set_extra_args(&args));
+            let actual = Adapter::for_package_manager(manager, Add)
+                .map(|adapter| adapter.set_extra_args(&args));
             let actual = actual.expect("expected Some for supported operation");
             match expected {
                 Some((program, args)) => {
@@ -242,8 +177,8 @@ mod tests {
         ];
 
         for (manager, expected) in cases {
-            let actual =
-                CommandAdaptor::for_pm(manager, Run).map(|adaptor| adaptor.set_extra_args(&args));
+            let actual = Adapter::for_package_manager(manager, Run)
+                .map(|adapter| adapter.set_extra_args(&args));
             match expected {
                 Some((program, args)) => {
                     let actual = actual.expect("expected Some for supported operation");
@@ -270,8 +205,8 @@ mod tests {
         ];
 
         for (manager, expected) in cases {
-            let actual =
-                CommandAdaptor::for_pm(manager, Dlx).map(|adaptor| adaptor.set_extra_args(&args));
+            let actual = Adapter::for_package_manager(manager, Dlx)
+                .map(|adapter| adapter.set_extra_args(&args));
             match expected {
                 Some((program, args)) => {
                     let actual = actual.expect("expected Some for supported operation");
@@ -299,8 +234,8 @@ mod tests {
         ];
 
         for (manager, operation) in unsupported {
-            let actual = CommandAdaptor::for_pm(manager, operation)
-                .map(|adaptor| adaptor.set_extra_args(&["foo".to_owned()]));
+            let actual = Adapter::for_package_manager(manager, operation)
+                .map(|adapter| adapter.set_extra_args(&["foo".to_owned()]));
             assert!(
                 actual.is_err(),
                 "expected None for unsupported mapping: {manager:?} {operation:?}"
